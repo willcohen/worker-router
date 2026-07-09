@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>worker-router browser-eval probe</title>
+<!--
+  Loaded by the browser-eval case in test/cljc/pool_test.cljc. Two probes:
+
+  1. Module evaluation: dist/index.mjs must import cleanly in a browser
+     (this is what regresses if someone moves to a top-level static
+     node:worker_threads import). The importmap maps the module's bare
+     externals ('comlink', 'squint-cljs/core.js') to their node_modules
+     ESM entries; worker-router itself is fetched from /dist/index.mjs.
+
+  2. Real pool round-trip: create a pool of Web Workers via the served
+     /dist/worker-bootstrap.mjs, call the echo handler through any(),
+     and terminate. Plain same-origin module workers need no special
+     headers, so this runs over the test's bare http server.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "comlink": "/node_modules/comlink/dist/esm/comlink.mjs",
+    "squint-cljs/core.js": "/node_modules/squint-cljs/src/squint/core.js"
+  }
+}
+</script>
+<script type="module">
+  // Wrap in try/catch so import errors propagate to window.__error rather
+  // than the unhandledrejection log only.
+  try {
+    const cp = await import('/dist/index.mjs');
+    window.__loaded = true;
+    window.__exports = Object.keys(cp).sort();
+    window.__runtime = cp.detectRuntime();
+    try {
+      const pool = await cp.WorkerPool.create({
+        size: 2,
+        bootstrap: new URL('/dist/worker-bootstrap.mjs', location.href).href,
+        handlers: {
+          echo: { module: new URL('/test/fixtures/echo-handler.mjs', location.href).href },
+        },
+      });
+      window.__poolRuntime = pool.runtime;
+      window.__poolEcho = await pool.any().echo.echo('browser-ok');
+      await pool.terminate();
+    } catch (err) {
+      window.__poolError = err && err.message ? err.message : String(err);
+    }
+    window.__poolDone = true;
+  } catch (err) {
+    window.__loaded = false;
+    window.__error = err && err.message ? err.message : String(err);
+    window.__poolDone = true;
+  }
+</script>
+</head>
+<body>
+<pre id="status">probing...</pre>
+</body>
+</html>

@@ -1,0 +1,84 @@
+{:tasks
+ {npm:install
+  {:doc "Install npm dependencies including squint-cljs."
+   :task (shell "npm" "install")}
+
+  squint:pool
+  {:doc "Compile src/cljc/pool.cljc -> pool.mjs alongside it, then bundle
+to dist/index.mjs with esbuild. `comlink`, `squint-cljs/*`, and `node:*`
+stay external on purpose: the published bundle contains no third-party
+code. Browser consumers map `comlink` and `squint-cljs/core.js` via a
+bundler or import map."
+   :depends [npm:install]
+   :task (let [src-dir "src/cljc"
+               compile (shell {:dir src-dir :continue true :out :string :err :string}
+                              "npx" "squint" "compile" "pool.cljc")]
+           (when (seq (:out compile)) (print (:out compile)))
+           (when (seq (:err compile)) (print (:err compile)))
+           (when (not= 0 (:exit compile))
+             (throw (ex-info "squint pool compile failed"
+                             {:exit (:exit compile) :err (:err compile)})))
+           (when (not (.exists (clojure.java.io/file "dist")))
+             (.mkdir (clojure.java.io/file "dist")))
+           (let [bundle (shell {:continue true :out :string :err :string}
+                               "npx" "esbuild" "src/cljc/pool.mjs"
+                               "--bundle" "--format=esm"
+                               "--external:comlink"
+                               "--external:squint-cljs/*"
+                               "--external:node:*"
+                               "--sourcemap"
+                               "--outfile=dist/index.mjs")]
+             (when (seq (:out bundle)) (print (:out bundle)))
+             (when (seq (:err bundle)) (print (:err bundle)))
+             (when (not= 0 (:exit bundle))
+               (throw (ex-info "esbuild bundle failed"
+                               {:exit (:exit bundle) :err (:err bundle)})))
+             (println "dist/index.mjs ready")))}
+
+  copy:dist-assets
+  {:doc "Copy the hand-written worker-bootstrap.mjs and index.d.ts into
+dist/. These are not generated; dist/ is the published artifact tree
+so the assets need to live there at publish time."
+   :task (do
+           (when (not (.exists (clojure.java.io/file "dist")))
+             (.mkdir (clojure.java.io/file "dist")))
+           (doseq [[from to] [["src/worker-bootstrap.mjs" "dist/worker-bootstrap.mjs"]
+                              ["src/index.d.ts"          "dist/index.d.ts"]]]
+             (clojure.java.io/copy (clojure.java.io/file from)
+                                   (clojure.java.io/file to))
+             (println from "->" to)))}
+
+  build
+  {:doc "Produce the publishable dist/ tree: squint-compiled pool +
+hand-written bootstrap + type declarations."
+   :depends [squint:pool copy:dist-assets]
+   :task (println "dist/ ready")}
+
+  squint:test:pool
+  {:doc "Compile test/cljc/pool_test.cljc -> pool_test.mjs, the single
+functional test suite, using squint's cljs.test adapter (deftest / is).
+Author in cljc, compile here, run via `bb test:cljs`."
+   :depends [npm:install]
+   :task (let [src-dir "test/cljc"
+               result  (shell {:dir src-dir :continue true :out :string :err :string}
+                              "npx" "squint" "compile" "pool_test.cljc")]
+           (when (seq (:out result)) (print (:out result)))
+           (when (seq (:err result)) (print (:err result)))
+           (when (not= 0 (:exit result))
+             (throw (ex-info "squint pool_test compile failed"
+                             {:exit (:exit result) :err (:err result)})))
+           (println "test/cljc/pool_test.mjs ready"))}
+
+  test:cljs
+  {:doc "Run the pool test suite (squint-compiled from
+test/cljc/pool_test.cljc). The test module registers each deftest at top
+level and calls cljs.test/run-tests on import; the node invocation just
+imports it. Depends on build (impl) and squint:test:pool (suite) so a
+stale .cljc edit on either side doesn't sneak into the run. Needs a
+Playwright chromium install for the browser-eval case."
+   :depends [build squint:test:pool]
+   :task (shell "node" "test/cljc/pool_test.mjs")}
+
+  test
+  {:doc "Alias for test:cljs, the single functional test suite."
+   :depends [test:cljs]}}}
