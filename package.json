@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "comlink": "^4.4.2",
-    "squint-cljs": "^0.14.202"
+    "squint-cljs": "^0.14.206"
   },
   "devDependencies": {
     "esbuild": "^0.27.3",
