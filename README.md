@@ -187,4 +187,4 @@ rejection.
 
 ## License
 
-Apache-2.0. See [`LICENSE`](./LICENSE).
+Apache-2.0 WITH LLVM-exception. See [`LICENSE`](./LICENSE).
