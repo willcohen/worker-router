@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.27.3",
-    "playwright": "^1.59.1"
+    "playwright": "^1.61.1"
   },
   "keywords": [
     "worker-router",
