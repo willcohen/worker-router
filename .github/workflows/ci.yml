@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The suite's browser-eval case launches Chromium through Playwright.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # `npm test` runs pretest (squint compile + esbuild bundle, then the
+      # test suite compile) and then the node runner.
+      - name: Test
+        run: npm test
