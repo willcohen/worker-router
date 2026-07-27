@@ -1,6 +1,9 @@
 /*
- * Copyright 2026 Will Cohen
- * SPDX-License-Identifier: Apache-2.0
+ * Copyright (c) 2026 Will Cohen
+ *
+ * Part of worker-router, under the Apache License v2.0 with LLVM Exceptions.
+ * See LICENSE for license information.
+ * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  *
  * Worker-side bootstrap. Loaded by the pool as the worker entrypoint
  * (Node `new Worker(new URL(bootstrap))` or browser `new Worker(url,

@@ -25,7 +25,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "rm -rf dist && mkdir -p dist && (cd src/cljc && npx squint compile pool.cljc) && npx esbuild src/cljc/pool.mjs --bundle --format=esm --external:comlink --external:squint-cljs/* --external:node:* --outfile=dist/index.mjs && cp src/worker-bootstrap.mjs dist/worker-bootstrap.mjs && cp src/index.d.ts dist/index.d.ts",
+    "build": "rm -rf dist && mkdir -p dist && (cd src/cljc && npx squint compile pool.cljc) && npx esbuild src/cljc/pool.mjs --bundle --format=esm --banner:js=\"/*\n * Copyright (c) 2026 Will Cohen\n *\n * Part of worker-router, under the Apache License v2.0 with LLVM Exceptions.\n * See LICENSE for license information.\n * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n */\" --external:comlink --external:squint-cljs/* --external:node:* --outfile=dist/index.mjs && cp src/worker-bootstrap.mjs dist/worker-bootstrap.mjs && cp src/index.d.ts dist/index.d.ts",
     "pretest": "npm run build && (cd test/cljc && npx squint compile pool_test.cljc)",
     "test": "node test/cljc/pool_test.mjs"
   },
