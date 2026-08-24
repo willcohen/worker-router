@@ -53,6 +53,23 @@
       (if (and (number? hc) (pos? hc)) hc DEFAULT-SIZE-FALLBACK))
     size))
 
+(defn ^:private browser-worker-url
+  "The Worker constructor rejects a cross-origin script URL, so a
+   bootstrap served from a CDN cannot be passed to it directly. A
+   cross-origin module *import* is permitted, so a same-origin blob:
+   module whose one statement imports the bootstrap stands in for it.
+   A same-origin URL passes through untouched, which keeps DevTools
+   naming and makes no blob. Returns #js {:url :blob}."
+  [bootstrap-url]
+  (let [u (new js/URL bootstrap-url js/location.href)]
+    (if (= (.-origin u) js/location.origin)
+      #js {:url bootstrap-url :blob false}
+      #js {:url (js/URL.createObjectURL
+                 (new js/Blob
+                      #js [(str "import " (js/JSON.stringify (.-href u)) ";")]
+                      #js {:type "text/javascript"}))
+           :blob true})))
+
 (defn ^:async spawn
   "Spawn one worker for `bootstrap-url`. Returns a handle
    #js {:raw :endpoint :terminate}."
@@ -67,12 +84,19 @@
       #js {:raw raw
            :endpoint endpoint
            :terminate (fn [] (.terminate raw))})
-    (let [raw (new js/Worker bootstrap-url #js {:type "module"})]
+    (let [shim (browser-worker-url bootstrap-url)
+          raw  (new js/Worker (.-url shim) #js {:type "module"})]
       #js {:raw raw
            :endpoint raw
            ;; Browser Worker.terminate() returns undefined; wrap so the
-           ;; handle's terminate is a promise on both platforms.
-           :terminate (fn [] (js/Promise.resolve (.terminate raw)))})))
+           ;; handle's terminate is a promise on both platforms. The blob
+           ;; URL is revoked here and not at spawn: the module fetch is
+           ;; async, and an early revoke can lose the race with it.
+           :terminate (fn ^:async terminate []
+                        (.terminate raw)
+                        (when (.-blob shim)
+                          (js/URL.revokeObjectURL (.-url shim)))
+                        nil)})))
 
 (defn ^:async ^:private await-ready
   "Resolve on the first 'worker-router/ready' message from `handle.raw`;

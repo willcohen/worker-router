@@ -771,26 +771,35 @@
 (def browser-eval-root
   (fileURLToPath (new js/URL "../../" js/import.meta.url)))
 
+(defn ^:private make-eval-server
+  "Static file server rooted at the repo. Every response carries
+   Access-Control-Allow-Origin: *, because the cross-origin shim test
+   imports /dist/worker-bootstrap.mjs from a second origin, and a
+   cross-origin module import is a CORS fetch."
+  []
+  (createServer
+   (fn ^:async serve-file [req res]
+     (try
+               (let [url       (new js/URL (.-url req)
+                                    (str "http://" (.-host (.-headers req))))
+                     pathname  (.-pathname url)
+                     p         (if (= pathname "/")
+                                 "/test/fixtures/browser-eval.html"
+                                 pathname)
+                     file-path (join browser-eval-root p)
+                     data      (await (readFile file-path))
+                     ext       (extname file-path)]
+                 (.setHeader res "Content-Type"
+                             (or (aget browser-eval-mime ext)
+                                 "application/octet-stream"))
+                 (.setHeader res "Access-Control-Allow-Origin" "*")
+                 (.end res data))
+               (catch :default _
+                 (set! (.-statusCode res) 404)
+                 (.end res (str "not found: " (.-url req))))))))
+
 (deftest ^:async browser-eval-module-evaluates-in-chromium
-  (let [server (createServer
-                ^:async (fn [req res]
-                          (try
-                            (let [url       (new js/URL (.-url req)
-                                                 (str "http://" (.-host (.-headers req))))
-                                  pathname  (.-pathname url)
-                                  p         (if (= pathname "/")
-                                              "/test/fixtures/browser-eval.html"
-                                              pathname)
-                                  file-path (join browser-eval-root p)
-                                  data      (await (readFile file-path))
-                                  ext       (extname file-path)]
-                              (.setHeader res "Content-Type"
-                                          (or (aget browser-eval-mime ext)
-                                              "application/octet-stream"))
-                              (.end res data))
-                            (catch :default _
-                              (set! (.-statusCode res) 404)
-                              (.end res (str "not found: " (.-url req)))))))]
+  (let [server (make-eval-server)]
     (await (js/Promise. (fn [resolve]
                              (.listen server 0 "127.0.0.1" resolve))))
     (let [port    (.-port (.address server))
@@ -834,6 +843,46 @@
         (finally
           (await (.close browser))
           (await (js/Promise. (fn [resolve] (.close server resolve)))))))))
+
+;; The blob shim: a cross-origin bootstrap URL cannot go to the Worker
+;; constructor directly, so browser-worker-url wraps it in a same-origin
+;; blob module. Two servers on distinct 127.0.0.1 ports are two real
+;; origins. The page records whether the URL it received is cross-origin,
+;; and the test asserts it, so a wiring mistake cannot pass this test
+;; with a same-origin bootstrap.
+(deftest ^:async browser-cross-origin-bootstrap-spawns-through-blob-shim
+  (let [server-a (make-eval-server)
+        server-b (make-eval-server)]
+    (await (js/Promise. (fn [resolve] (.listen server-a 0 "127.0.0.1" resolve))))
+    (await (js/Promise. (fn [resolve] (.listen server-b 0 "127.0.0.1" resolve))))
+    (let [port-a  (.-port (.address server-a))
+          port-b  (.-port (.address server-b))
+          boot-b  (str "http://127.0.0.1:" port-b "/dist/worker-bootstrap.mjs")
+          browser (await (.launch chromium #js {:headless true}))]
+      (try
+        (let [page   (await (.newPage browser))
+              errors (js/Array.)]
+          (.on page "pageerror" (fn [err] (.push errors (.-message err))))
+          (await (.goto page (str "http://127.0.0.1:" port-a
+                                  "/test/fixtures/cross-origin-shim.html?bootstrap="
+                                  (js/encodeURIComponent boot-b))
+                        #js {:waitUntil "load"}))
+          (await (.waitForFunction page "window.__shimDone === true"
+                                   nil #js {:timeout 20000}))
+          (let [cross (await (.evaluate page "window.__crossOrigin"))
+                err   (await (.evaluate page "window.__shimError"))
+                echo  (await (.evaluate page "window.__shimEcho"))]
+            (is (= true cross)
+                "the bootstrap URL must be cross-origin, or this proves nothing")
+            (is (nil? err) (str "cross-origin pool failed: " err))
+            (is (= "shim-ok" echo)
+                "echo round-trip through the blob-shimmed worker")
+            (is (= 0 (.-length errors))
+                (str "unexpected page errors: " (.join errors " | ")))))
+        (finally
+          (await (.close browser))
+          (await (js/Promise. (fn [resolve] (.close server-a resolve))))
+          (await (js/Promise. (fn [resolve] (.close server-b resolve)))))))))
 
 ;; Run on module load. node test/cljc/pool_test.mjs imports this file;
 ;; deftest forms above register at top level; run-tests then iterates
