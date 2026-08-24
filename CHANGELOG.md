@@ -32,3 +32,6 @@ Initial release.
 - TypeScript declarations. `comlink` and `squint-cljs/core.js` stay
   external to the published bundle; a bundler resolves them, or map them
   in an import map for browsers without one.
+
+[0.0.2]: https://github.com/willcohen/worker-router/compare/0.0.1...0.0.2
+[0.0.1]: https://github.com/willcohen/worker-router/releases/tag/0.0.1

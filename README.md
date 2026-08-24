@@ -1,5 +1,8 @@
 # worker-router
 
+[![CI](https://github.com/willcohen/worker-router/actions/workflows/ci.yml/badge.svg)](https://github.com/willcohen/worker-router/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/%40wcohen%2Fworker-router.svg)](https://www.npmjs.com/package/@wcohen/worker-router)
+
 worker-router gets you throughput from single-threaded JavaScript, in the
 spirit of parallel, multithreaded use of a thread-safe native library: load
 N instances of a module (say a WASM build) across N workers, then route each
