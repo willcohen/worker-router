@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>worker-router cross-origin shim probe</title>
+<!--
+  Copyright (c) 2026 Will Cohen
+
+  Part of worker-router, under the Apache License v2.0 with LLVM Exceptions.
+  See LICENSE for license information.
+  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+  Loaded by the cross-origin shim case in test/cljc/pool_test.cljc. The
+  ?bootstrap= query parameter carries a worker-bootstrap.mjs URL on a
+  DIFFERENT origin (a second 127.0.0.1 port). The Worker constructor
+  rejects a cross-origin script, so pool creation succeeds only through
+  the blob shim in browser-worker-url. The echo handler module still
+  comes from this page's own origin.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "comlink": "/node_modules/comlink/dist/esm/comlink.mjs",
+    "squint-cljs/core.js": "/node_modules/squint-cljs/src/squint/core.js"
+  }
+}
+</script>
+<script type="module">
+  try {
+    const cp = await import('/dist/index.mjs');
+    const bootstrap = new URLSearchParams(location.search).get('bootstrap');
+    window.__crossOrigin = new URL(bootstrap).origin !== location.origin;
+    const pool = await cp.WorkerPool.create({
+      size: 2,
+      bootstrap,
+      handlers: {
+        echo: { module: new URL('/test/fixtures/echo-handler.mjs', location.href).href },
+      },
+    });
+    window.__shimEcho = await pool.any().echo.echo('shim-ok');
+    await pool.terminate();
+  } catch (err) {
+    window.__shimError = err && err.message ? err.message : String(err);
+  }
+  window.__shimDone = true;
+</script>
+</head>
+<body>
+<pre id="status">probing...</pre>
+</body>
+</html>

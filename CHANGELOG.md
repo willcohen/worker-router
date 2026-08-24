@@ -5,10 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Browser: a cross-origin `bootstrap` URL (for example a CDN copy of
+  `worker-bootstrap.mjs`) now works, through a same-origin blob shim.
+
 ### Changed
 
 - License is now Apache-2.0 WITH LLVM-exception (previously Apache-2.0).
-- Bumped squint-cljs to 0.14.206.
+- Bumped squint-cljs to 0.14.208.
 
 ## [0.0.1] - 2026-07-09
 
