@@ -95,8 +95,10 @@ bundler, map them in an import map:
 ```
 
 The bootstrap and handler modules load inside workers by URL, so they
-need no mapping; serve them same-origin (or CORS-readable) and pass
-absolute URLs.
+need no mapping; serve them same-origin or CORS-readable and pass
+absolute URLs. A cross-origin bootstrap (for example, a CDN copy)
+works: the pool wraps it in a same-origin blob module before it
+reaches the Worker constructor.
 
 Workers import Comlink from a URL the pool resolves page-side via
 `import.meta.resolve("comlink")`. If your bundler mangles or drops
