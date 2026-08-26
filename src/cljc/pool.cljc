@@ -10,6 +10,12 @@
 (ns pool
   (:require ["comlink" :as Comlink]))
 
+(def transfer
+  "Comlink transfer, re-exported so callers mark transferables against
+   the same comlink instance the pool's proxies send through. A mark
+   made with a different comlink copy is silently ignored."
+  Comlink/transfer)
+
 (def ^:private DEFAULT-SIZE-FALLBACK 4)
 ;; Defaults for the two PoolOptions timeouts. The bootstrap default is
 ;; generous because handler init can legitimately take a while (large

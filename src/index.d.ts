@@ -59,6 +59,12 @@ export interface WorkerHandle {
 
 export function spawn(bootstrapUrl: string): Promise<WorkerHandle>;
 
+/**
+ * Comlink transfer, re-exported so callers mark transferables against the
+ * same comlink instance the pool's proxies send through.
+ */
+export function transfer<T>(value: T, transfers: Transferable[]): T;
+
 export interface WorkerClaim {
   /** Pool index of the claimed worker. */
   index: number;
