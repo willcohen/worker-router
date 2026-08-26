@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Re-export comlink `transfer`, so callers mark transferables against the
+  same comlink instance the pool sends through.
+
 ## [0.0.2] - 2026-08-24
 
 ### Added
@@ -33,5 +40,6 @@ Initial release.
   external to the published bundle; a bundler resolves them, or map them
   in an import map for browsers without one.
 
+[Unreleased]: https://github.com/willcohen/worker-router/compare/0.0.2...HEAD
 [0.0.2]: https://github.com/willcohen/worker-router/compare/0.0.1...0.0.2
 [0.0.1]: https://github.com/willcohen/worker-router/releases/tag/0.0.1

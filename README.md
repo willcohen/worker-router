@@ -171,6 +171,24 @@ Pinned calls, in-flight `any()` calls, and open claims all count toward one
 per-worker load number, so `pool.any()` steers away from workers that are
 already busy with claims or pinned work.
 
+## Transferring buffers
+
+A binary argument is copied into the worker. Mark a large buffer as
+transferable and the worker gets the same memory instead:
+
+```js
+import { transfer } from '@wcohen/worker-router';
+
+const coords = new Float64Array(1_000_000);
+await pool.any().geo.project(transfer(coords, [coords.buffer]));
+// coords is detached now: coords.length === 0
+```
+
+Import `transfer` from this package. Comlink keeps the mark in a table
+owned by one copy of its module, so a mark from a different copy does
+nothing: the pool copies the buffer and reports no error. Return values
+have no matching mark, so a result comes back as a copy.
+
 ## Shutting down
 
 `pool.terminate()` runs each handler module's optional top-level `destroy`

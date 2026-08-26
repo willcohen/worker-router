@@ -30,7 +30,7 @@
             ["comlink" :as Comlink]
             ["comlink/dist/esm/node-adapter.mjs" :as node-adapter-mod]
             ["playwright" :refer [chromium]]
-            ["../../dist/index.mjs" :refer [WorkerPool detectRuntime spawn]]))
+            ["../../dist/index.mjs" :refer [WorkerPool detectRuntime spawn transfer]]))
 
 (def nodeEndpoint (.-default node-adapter-mod))
 
@@ -713,6 +713,22 @@
     (is (some? err) "bogus comlinkUrl should reject create()")
     (is (.includes (.-message err) "bootstrap failed"))))
 
+(deftest ^:async marked-buffer-moves-instead-of-copying
+  ;; Comlink holds the mark in a WeakMap owned by one copy of its module,
+  ;; so a detached source also proves the re-export is the same instance
+  ;; the pool sends through; a foreign copy's mark would clone silently.
+  (let [pool (await (make-pool #js {:echo #js {:module echo-url}} 1))]
+    (try
+      (let [coords (js/Float64Array. #js [1 2 3 4])
+            buf    (.-buffer coords)
+            out    (await (.echo (.-echo (.worker pool 0))
+                                 (transfer coords #js [buf])))]
+        (is (= 0 (.-byteLength buf)) "source buffer should be detached")
+        (is (= 0 (.-length coords)))
+        (is (= #js [1 2 3 4] (js/Array.from out))))
+      (finally
+        (await ((.-terminate pool)))))))
+
 (deftest detect-runtime-returns-node-under-node-test
   (is (= "node" (detectRuntime))))
 
@@ -829,7 +845,7 @@
             (is (= true loaded)
                 (str "module failed to load in browser: " error
                      " (page errors: " (.join errors " | ") ")"))
-            (is (= #js ["WorkerPool" "detectRuntime" "spawn"] (.sort exports))
+            (is (= #js ["WorkerPool" "detectRuntime" "spawn" "transfer"] (.sort exports))
                 (str "unexpected exports: " (.join exports ", ")))
             (is (= "browser" runtime)
                 (str "detectRuntime() in browser returned " runtime))
